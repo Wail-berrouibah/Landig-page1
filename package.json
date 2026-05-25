@@ -1,0 +1,29 @@
+{
+  "name": "landing-page1",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "algeria-locations": "^1.0.6",
+    "next": "^15.3.1",
+    "nodemailer": "^8.0.8",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.6",
+    "@types/node": "^22.15.3",
+    "@types/nodemailer": "^8.0.0",
+    "@types/react": "^19.1.4",
+    "@types/react-dom": "^19.1.5",
+    "eslint": "^9.26.0",
+    "eslint-config-next": "^15.3.1",
+    "tailwindcss": "^4.1.6",
+    "typescript": "^5.8.3"
+  }
+}
