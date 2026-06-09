@@ -102,15 +102,21 @@ export default function OrderForm() {
     const errs = validateForm(data);
     if (Object.keys(errs).length > 0) return;
 
+    const phoneClean = data.phone.replace(/\s+/g, "");
+    const phoneNormalized = phoneClean.startsWith("+213")
+      ? phoneClean
+      : phoneClean.startsWith("0")
+      ? "+213" + phoneClean.slice(1)
+      : "+213" + phoneClean;
+
     const order = {
-      name: data.name,
-      phone: data.phone,
+      full_name: data.name,
+      phone_number: phoneNormalized,
       wilaya: selectedWilayaName || data.wilaya,
       commune: data.commune,
-      address: data.address,
+      delivery_address: data.address,
       notes: data.notes,
       quantity: data.quantity,
-      total: CONFIG.product.price * data.quantity,
     };
 
     fetch("/api/orders", {
@@ -121,9 +127,9 @@ export default function OrderForm() {
       .then((res) => res.json())
       .then((res) => {
         if (res.success) {
-          alert(`Commande confirmée !\n\nRéf : ${res.order.id}\nTotal : ${formatPrice(res.order.total)}\n\nUn conseiller vous contactera sous 24h.`);
+          alert(`Commande confirmée !\n\nRéf : ${res.order_number}\nTotal : ${formatPrice(CONFIG.product.price * data.quantity)}\n\nUn conseiller vous contactera sous 24h.`);
         } else {
-          alert("Erreur lors de l'enregistrement de la commande. Veuillez réessayer.");
+          alert("Erreur : " + (res.error || "Veuillez réessayer."));
         }
       })
       .catch(() => {

@@ -1,20 +1,28 @@
 import fs from "fs";
 import path from "path";
 
-export type OrderStatus = "en_attente" | "confirme" | "annule";
+export type OrderStatus =
+  | "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled"
+  | "en_attente" | "confirme" | "annule";
 
 export type Order = {
   id: string;
+  order_number?: string;
   name: string;
+  full_name?: string;
   phone: string;
+  phone_number?: string;
   wilaya: string;
   commune: string;
   address: string;
+  delivery_address?: string;
   notes: string;
   quantity: number;
   total: number;
   date: string;
+  created_at?: string;
   status: OrderStatus;
+  payment_status?: string;
 };
 
 export type AdminCredentials = {

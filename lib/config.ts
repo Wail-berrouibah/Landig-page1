@@ -41,10 +41,10 @@ export const CONFIG = {
     { label: "Poids", value: "1,8 kg" },
   ] satisfies Spec[],
   benefits: [
-    { icon: "⚡", text: "Fluidité au quotidien – Travail, cours et jeux sans ralentissement." },
-    { icon: "🖥️", text: "Confort visuel – Écran IPS FHD pour travailler sans fatigue." },
-    { icon: "🎒", text: "Ultra portable – 1,8 kg, facile à emporter partout." },
-    { icon: "🔌", text: "Prêt à l’emploi – Windows 11 installé, pilotes inclus." },
+    { icon: "bolt", text: "Fluidité au quotidien – Travail, cours et jeux sans ralentissement." },
+    { icon: "screen", text: "Confort visuel – Écran IPS FHD pour travailler sans fatigue." },
+    { icon: "laptop", text: "Ultra portable – 1,8 kg, facile à emporter partout." },
+    { icon: "plug", text: "Prêt à l’emploi – Windows 11 installé, pilotes inclus." },
   ] satisfies Benefit[],
   proofPoints: [
     { icon: "", text: "Livraison gratuite partout en Algérie (48 wilayas)" },
@@ -150,6 +150,7 @@ export const CONFIG = {
   ] satisfies FAQItem[],
 } as const;
 
-export function formatPrice(price: number): string {
+export function formatPrice(price: number | undefined | null): string {
+  if (price == null || isNaN(price)) return "0 DA";
   return price.toLocaleString("fr-DZ") + " DA";
 }

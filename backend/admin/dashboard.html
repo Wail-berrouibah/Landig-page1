@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tableau de bord – TechPro Admin</title>
+  <link rel="stylesheet" href="/admin/style.css">
+</head>
+<body class="dashboard-page">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-logo">TechPro Admin</span>
+      <button class="sidebar-close" onclick="toggleSidebar()">&times;</button>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-item active" onclick="switchTab('orders')" data-tab="orders">
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;vertical-align:middle"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2 13h13l3-8H6"/></svg></span> Commandes
+      </button>
+      <button class="nav-item" onclick="switchTab('admins')" data-tab="admins">
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;vertical-align:middle"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Administrateurs
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <span class="text-sm" id="sidebarAdminName"></span>
+      <button class="btn btn-ghost btn-sm" onclick="logout()">Déconnexion</button>
+    </div>
+  </aside>
+
+  <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+  <main class="main-content">
+    <header class="topbar">
+      <button class="hamburger" onclick="toggleSidebar()">☰</button>
+      <h2 id="pageTitle">Commandes</h2>
+      <div class="topbar-right">
+        <span class="text-sm text-muted" id="topbarAdminName"></span>
+      </div>
+    </header>
+
+    <!-- ── Orders Tab ── -->
+    <div id="tab-orders" class="tab-content active">
+      <div class="filters">
+        <input type="text" id="searchInput" placeholder="Rechercher (n° commande, client, téléphone)..." oninput="debounceLoad()">
+        <input type="date" id="dateFrom" onchange="loadOrders()" title="Date début">
+        <input type="date" id="dateTo" onchange="loadOrders()" title="Date fin">
+        <button class="btn btn-sm btn-primary" onclick="exportCSV()" title="Télécharger en CSV">Télécharger </button>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table" id="ordersTable">
+          <thead>
+            <tr>
+              <th data-sort="order_number" onclick="sortBy('order_number')">N° Commande <span class="sort-icon">↕</span></th>
+              <th data-sort="full_name" onclick="sortBy('full_name')">Client <span class="sort-icon">↕</span></th>
+              <th data-sort="phone_number" onclick="sortBy('phone_number')">Téléphone <span class="sort-icon">↕</span></th>
+              <th data-sort="wilaya" onclick="sortBy('wilaya')">Wilaya <span class="sort-icon">↕</span></th>
+              <th data-sort="quantity" onclick="sortBy('quantity')">Qté <span class="sort-icon">↕</span></th>
+              <th>Total</th>
+              <th data-sort="payment_status" onclick="sortBy('payment_status')">Paiement <span class="sort-icon">↕</span></th>
+              <th data-sort="created_at" onclick="sortBy('created_at')">Date <span class="sort-icon">↕</span></th>
+            </tr>
+          </thead>
+          <tbody id="ordersBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+
+    <!-- ── Admins Tab ── -->
+    <div id="tab-admins" class="tab-content">
+      <div class="section-header">
+        <h3>Gestion des administrateurs</h3>
+        <button class="btn btn-primary" onclick="showAddAdminModal()">+ Ajouter</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Identifiant</th>
+              <th>Email</th>
+              <th>Nom complet</th>
+              <th>Rôle</th>
+              <th>Statut</th>
+              <th>Dernière connexion</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="adminsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- ── Order Detail Modal ── -->
+  <div id="orderModal" class="modal-overlay" style="display:none">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h2 id="orderModalTitle">Détail de la commande</h2>
+        <button class="modal-close" onclick="closeOrderModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="orderModalBody"></div>
+    </div>
+  </div>
+
+  <!-- ── Add Admin Modal ── -->
+  <div id="addAdminModal" class="modal-overlay" style="display:none">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Ajouter un administrateur</h2>
+        <button class="modal-close" onclick="document.getElementById('addAdminModal').style.display='none'">&times;</button>
+      </div>
+      <form id="addAdminForm" class="modal-form">
+        <div class="form-group">
+          <label for="aa-username">Identifiant</label>
+          <input id="aa-username" type="text" required>
+        </div>
+        <div class="form-group">
+          <label for="aa-email">Email</label>
+          <input id="aa-email" type="email" required>
+        </div>
+        <div class="form-group">
+          <label for="aa-fullname">Nom complet</label>
+          <input id="aa-fullname" type="text" required>
+        </div>
+        <div class="form-group">
+          <label for="aa-password">Mot de passe</label>
+          <input id="aa-password" type="password" placeholder="Min. 6 caractères" required>
+        </div>
+        <p id="aaError" class="error-msg"></p>
+        <button type="submit" class="btn btn-primary btn-full">Créer</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" style="display:none"></div>
+
+  <script>
+    let currentAdmin = null;
+    let currentSortBy = 'created_at';
+    let currentSortOrder = 'DESC';
+    let currentPage = 1;
+    let selectedOrderId = null;
+
+    // ── Auth check ──────────────────────────────────────────────────
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/admin/orders?limit=1');
+        if (!res.ok) {
+          window.location.href = '/admin/login.html';
+          return;
+        }
+        // Get session info from settings
+        const sRes = await fetch('/api/admin/settings');
+        if (sRes.ok) {
+          const sData = await sRes.json();
+          // We stored admin info in session — get from a separate endpoint
+        }
+      } catch {
+        window.location.href = '/admin/login.html';
+      }
+    }
+
+    // We don't have a /api/admin/me endpoint, so derive from the settings + admin data
+    // For simplicity, the session stores adminId. We'll just check auth on each request.
+
+    // ── Tabs ────────────────────────────────────────────────────────
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      document.getElementById(`tab-${tab}`).classList.add('active');
+      document.querySelector(`.nav-item[data-tab="${tab}"]`).classList.add('active');
+      document.getElementById('pageTitle').textContent = tab === 'orders' ? 'Commandes' : 'Administrateurs';
+      if (tab === 'orders') loadOrders();
+      if (tab === 'admins') loadAdmins();
+    }
+
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.querySelector('.sidebar-overlay').classList.toggle('visible');
+    }
+
+    // ── Orders ──────────────────────────────────────────────────────
+    async function loadOrders() {
+      const search = document.getElementById('searchInput').value;
+      const dateFrom = document.getElementById('dateFrom').value;
+      const dateTo = document.getElementById('dateTo').value;
+
+      const params = new URLSearchParams({
+        search, date_from: dateFrom, date_to: dateTo,
+        sort_by: currentSortBy, sort_order: currentSortOrder,
+        page: currentPage, limit: 20,
+      });
+
+      try {
+        const res = await fetch(`/api/admin/orders?${params}`);
+        if (res.status === 401) { window.location.href = '/admin/login.html'; return; }
+        const data = await res.json();
+        renderOrders(data.orders);
+        renderPagination(data);
+      } catch (err) {
+        console.error('loadOrders error:', err);
+      }
+    }
+
+    function renderOrders(orders) {
+      const tbody = document.getElementById('ordersBody');
+      if (orders.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty">Aucune commande trouvée</td></tr>';
+        return;
+      }
+      tbody.innerHTML = orders.map(o => `
+        <tr onclick="openOrderDetail(${o.id})" class="clickable">
+          <td><span class="order-num">${o.order_number}</span></td>
+          <td>${escapeHtml(o.full_name)}</td>
+          <td>${escapeHtml(o.phone_number)}</td>
+          <td>${escapeHtml(o.wilaya)}</td>
+          <td>${o.quantity}</td>
+          <td class="text-muted">${formatPrice(o.total)}</td>
+          <td><span class="badge badge-payment-${o.payment_status}">${paymentLabel(o.payment_status)}</span></td>
+          <td class="text-muted">${o.created_at ? o.created_at.slice(0, 10) : ''}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderPagination(data) {
+      const el = document.getElementById('pagination');
+      if (data.totalPages <= 1) { el.innerHTML = ''; return; }
+      let html = `<span class="page-info">${data.total} commandes — Page ${data.page}/${data.totalPages}</span><div class="page-btns">`;
+      if (data.page > 1) html += `<button onclick="goPage(${data.page - 1})" class="btn btn-ghost btn-sm">Précédent</button>`;
+      if (data.page < data.totalPages) html += `<button onclick="goPage(${data.page + 1})" class="btn btn-ghost btn-sm">Suivant</button>`;
+      html += '</div>';
+      el.innerHTML = html;
+    }
+
+    function goPage(p) { currentPage = p; loadOrders(); }
+
+    function sortBy(col) {
+      if (currentSortBy === col) {
+        currentSortOrder = currentSortOrder === 'ASC' ? 'DESC' : 'ASC';
+      } else {
+        currentSortBy = col;
+        currentSortOrder = 'DESC';
+      }
+      document.querySelectorAll('.sort-icon').forEach(el => el.textContent = '↕');
+      const active = document.querySelector(`th[data-sort="${col}"] .sort-icon`);
+      if (active) active.textContent = currentSortOrder === 'ASC' ? '↑' : '↓';
+      loadOrders();
+    }
+
+    function exportCSV() {
+      const search = document.getElementById('searchInput').value;
+      const dateFrom = document.getElementById('dateFrom').value;
+      const dateTo = document.getElementById('dateTo').value;
+      const params = new URLSearchParams({ search, date_from: dateFrom, date_to: dateTo, sort_by: currentSortBy, sort_order: currentSortOrder });
+
+      fetch(`/api/admin/orders/export?${params}`)
+        .then((res) => {
+          if (res.status === 401) { window.location.href = '/admin/login.html'; return null; }
+          if (!res.ok) { return res.json().then((d) => { throw new Error(d.error || 'Erreur'); }); }
+          return res.blob();
+        })
+        .then((blob) => {
+          if (!blob) return;
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'commandes.csv';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showToast('CSV téléchargé');
+        })
+        .catch((err) => {
+          alert(err.message || 'Erreur de téléchargement');
+        });
+    }
+
+    let debounceTimer;
+    function debounceLoad() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => { currentPage = 1; loadOrders(); }, 300);
+    }
+
+    // ── Order Detail ────────────────────────────────────────────────
+    async function openOrderDetail(id) {
+      selectedOrderId = id;
+      try {
+        const res = await fetch(`/api/admin/orders/${id}`);
+        if (res.status === 401) { window.location.href = '/admin/login.html'; return; }
+        const data = await res.json();
+        renderOrderDetail(data.order, data.history);
+        document.getElementById('orderModal').style.display = 'flex';
+      } catch (err) {
+        console.error('openOrderDetail error:', err);
+      }
+    }
+
+    function closeOrderModal() {
+      document.getElementById('orderModal').style.display = 'none';
+    }
+
+    function renderOrderDetail(order, history) {
+      const body = document.getElementById('orderModalBody');
+      document.getElementById('orderModalTitle').textContent = `Commande ${order.order_number}`;
+
+      body.innerHTML = `
+        <div class="detail-grid">
+          <div class="detail-section">
+            <h4>Client</h4>
+            <div class="detail-row"><span class="detail-label">Nom</span><span>${escapeHtml(order.full_name)}</span></div>
+            <div class="detail-row"><span class="detail-label">Téléphone</span><span>${escapeHtml(order.phone_number)}</span></div>
+            <div class="detail-row"><span class="detail-label">Wilaya</span><span>${escapeHtml(order.wilaya)}</span></div>
+            <div class="detail-row"><span class="detail-label">Commune</span><span>${escapeHtml(order.commune)}</span></div>
+            <div class="detail-row"><span class="detail-label">Adresse</span><span>${escapeHtml(order.delivery_address)}</span></div>
+            <div class="detail-row"><span class="detail-label">Quantité</span><span>${order.quantity}</span></div>
+            <div class="detail-row"><span class="detail-label">Total</span><span>${formatPrice(order.total)}</span></div>
+            ${order.notes ? `<div class="detail-row"><span class="detail-label">Notes client</span><span>${escapeHtml(order.notes)}</span></div>` : ''}
+          </div>
+          <div class="detail-section">
+            <h4>Gestion</h4>
+            <div class="detail-row">
+              <span class="detail-label">Paiement</span>
+              <div class="payment-btns">
+                ${['pending','paid','failed'].map(p =>
+                  `<button class="btn btn-sm ${p === order.payment_status ? 'btn-primary' : 'btn-ghost'}" onclick="updatePayment(${order.id}, '${p}')">${paymentLabel(p)}</button>`
+                ).join('')}
+              </div>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Notes admin</span>
+              <textarea id="adminNotes" class="form-textarea" rows="3">${escapeHtml(order.admin_notes || '')}</textarea>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="saveAdminNotes(${order.id})">Enregistrer les notes</button>
+            <div class="detail-row detail-date">
+              <span class="detail-label">Créée le</span><span>${order.created_at || '-'}</span>
+            </div>
+            <div class="detail-row detail-date">
+              <span class="detail-label">Modifiée le</span><span>${order.updated_at || '-'}</span>
+            </div>
+            <div class="detail-row" style="margin-top:12px;padding-top:12px;border-top:1px solid #f0eeea">
+              <button class="btn btn-sm btn-danger" onclick="deleteOrder(${order.id})">Supprimer la commande</button>
+            </div>
+          </div>
+        </div>
+        <div class="history-section">
+          <h4>Historique</h4>
+          <div class="timeline">
+            ${history.length === 0 ? '<p class="text-muted">Aucun historique</p>' :
+              history.map(h => `
+                <div class="timeline-item">
+                  <div class="timeline-dot"></div>
+                  <div class="timeline-content">
+                    <div class="timeline-header">
+                      ${h.action === 'created' ? 'Commande créée' :
+                        h.action === 'status_change' ? `${statusLabel(h.old_status)} → ${statusLabel(h.new_status)}` :
+                        h.action === 'payment_change' ? `Paiement : ${paymentLabel(h.old_status)} → ${paymentLabel(h.new_status)}` :
+                        h.action === 'note_updated' ? 'Notes admin mises à jour' :
+                        h.action}
+                      <span class="timeline-date">${h.created_at || ''}</span>
+                    </div>
+                    ${h.admin_name ? `<div class="timeline-admin">par ${escapeHtml(h.admin_name)}</div>` : ''}
+                    ${h.note ? `<div class="timeline-note">${escapeHtml(h.note)}</div>` : ''}
+                  </div>
+                </div>
+              `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    async function updateOrderStatus(id, status) {
+      try {
+        const res = await fetch(`/api/admin/orders/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status }),
+        });
+        if (res.ok) { openOrderDetail(id); loadOrders(); showToast('Statut mis à jour'); }
+        else { const d = await res.json(); alert(d.error); }
+      } catch { alert('Erreur réseau'); }
+    }
+
+    async function updatePayment(id, payment_status) {
+      try {
+        const res = await fetch(`/api/admin/orders/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ payment_status }),
+        });
+        if (res.ok) { openOrderDetail(id); loadOrders(); showToast('Paiement mis à jour'); }
+        else { const d = await res.json(); alert(d.error); }
+      } catch { alert('Erreur réseau'); }
+    }
+
+    async function deleteOrder(id) {
+      if (!confirm('Supprimer cette commande définitivement ?')) return;
+      try {
+        const res = await fetch(`/api/admin/orders/${id}`, { method: 'DELETE' });
+        if (res.status === 401) { window.location.href = '/admin/login.html'; return; }
+        if (res.ok) {
+          closeOrderModal();
+          loadOrders();
+          showToast('Commande supprimée');
+        } else {
+          const d = await res.json();
+          alert(d.error || 'Erreur');
+        }
+      } catch { alert('Erreur réseau'); }
+    }
+
+    async function saveAdminNotes(id) {
+      const admin_notes = document.getElementById('adminNotes').value;
+      try {
+        const res = await fetch(`/api/admin/orders/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ admin_notes }),
+        });
+        if (res.ok) showToast('Notes enregistrées');
+        else { const d = await res.json(); alert(d.error); }
+      } catch { alert('Erreur réseau'); }
+    }
+
+    // ── Admins ──────────────────────────────────────────────────────
+    async function loadAdmins() {
+      try {
+        const res = await fetch('/api/admin/admins');
+        if (res.status === 401) { window.location.href = '/admin/login.html'; return; }
+        const data = await res.json();
+        renderAdmins(data.admins);
+      } catch (err) {
+        console.error('loadAdmins error:', err);
+      }
+    }
+
+    function renderAdmins(admins) {
+      const tbody = document.getElementById('adminsBody');
+      if (admins.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty">Aucun administrateur</td></tr>';
+        return;
+      }
+      tbody.innerHTML = admins.map(a => `
+        <tr>
+          <td>${escapeHtml(a.username)}</td>
+          <td>${escapeHtml(a.email)}</td>
+          <td>${escapeHtml(a.full_name)}</td>
+          <td>${a.role}</td>
+          <td>${a.is_active ? '<span class="badge badge-active">Actif</span>' : '<span class="badge badge-inactive">Inactif</span>'}</td>
+          <td class="text-muted">${a.last_login || '-'}</td>
+          <td>
+            <button class="btn btn-sm ${a.is_active ? 'btn-warning' : 'btn-primary'}" onclick="toggleAdmin(${a.id}, ${a.is_active ? 0 : 1})"
+              ${a.id === getMyId() ? 'disabled title="Vous ne pouvez pas vous désactiver"' : ''}>
+              ${a.is_active ? 'Désactiver' : 'Activer'}
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function toggleAdmin(id, is_active) {
+      try {
+        const res = await fetch(`/api/admin/admins/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_active }),
+        });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error); return; }
+        loadAdmins();
+        showToast(is_active ? 'Administrateur activé' : 'Administrateur désactivé');
+      } catch { alert('Erreur réseau'); }
+    }
+
+    function showAddAdminModal() {
+      document.getElementById('addAdminForm').reset();
+      document.getElementById('aaError').textContent = '';
+      document.getElementById('addAdminModal').style.display = 'flex';
+    }
+
+    document.getElementById('addAdminForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errEl = document.getElementById('aaError');
+      errEl.textContent = '';
+      const data = {
+        username: document.getElementById('aa-username').value,
+        email: document.getElementById('aa-email').value,
+        full_name: document.getElementById('aa-fullname').value,
+        password: document.getElementById('aa-password').value,
+      };
+      try {
+        const res = await fetch('/api/admin/admins', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        const result = await res.json();
+        if (!res.ok) { errEl.textContent = result.error; return; }
+        document.getElementById('addAdminModal').style.display = 'none';
+        loadAdmins();
+        showToast('Administrateur créé');
+      } catch { errEl.textContent = 'Erreur réseau'; }
+    });
+
+    // ── Helpers ─────────────────────────────────────────────────────
+    function statusLabel(s) {
+      const labels = {
+        pending: 'En attente', confirmed: 'Confirmé', processing: 'En traitement',
+        shipped: 'Expédié', delivered: 'Livré', cancelled: 'Annulé',
+      };
+      return labels[s] || s;
+    }
+
+    function paymentLabel(s) {
+      const labels = { pending: 'En attente', paid: 'Payé', failed: 'Échoué' };
+      return labels[s] || s;
+    }
+
+    function formatPrice(price) {
+      if (price == null || isNaN(price)) return "0 DA";
+      return Number(price).toLocaleString("fr-DZ") + " DA";
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function getMyId() {
+      // Stored after login — we can't get it easily without a /api/admin/me endpoint
+      // For now, just return a sentinel since the server prevents self-disable anyway
+      return -1;
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.style.display = 'block';
+      setTimeout(() => { toast.style.display = 'none'; }, 3000);
+    }
+
+    function logout() {
+      fetch('/api/admin/logout', { method: 'POST' }).then(() => {
+        window.location.href = '/admin/login.html';
+      });
+    }
+
+    // ── SSE Notifications ───────────────────────────────────────────
+    let eventSource = null;
+    function connectSSE() {
+      if (eventSource) eventSource.close();
+      eventSource = new EventSource('/api/admin/notifications');
+      eventSource.addEventListener('new_order', (e) => {
+        const data = JSON.parse(e.data);
+        showToast(`Nouvelle commande: ${data.order_number} – ${data.full_name}`);
+        if (document.getElementById('tab-orders').classList.contains('active')) loadOrders();
+      });
+      eventSource.addEventListener('order_updated', () => {
+        if (document.getElementById('tab-orders').classList.contains('active')) loadOrders();
+      });
+      eventSource.onerror = () => {
+        eventSource.close();
+        setTimeout(connectSSE, 5000);
+      };
+    }
+
+    // ── Init ────────────────────────────────────────────────────────
+    async function init() {
+      try {
+        const res = await fetch('/api/admin/me');
+        if (!res.ok) { window.location.href = '/admin/login.html'; return; }
+        const data = await res.json();
+        const name = data.admin.full_name || data.admin.username;
+        document.getElementById('sidebarAdminName').textContent = name;
+        document.getElementById('topbarAdminName').textContent = name;
+      } catch {
+        window.location.href = '/admin/login.html';
+        return;
+      }
+      loadOrders();
+      connectSSE();
+    }
+
+    init();
+  </script>
+</body>
+</html>

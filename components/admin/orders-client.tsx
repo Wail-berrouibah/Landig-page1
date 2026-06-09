@@ -6,8 +6,14 @@ import type { Order } from "@/lib/data";
 import StatusSelect from "./status-select";
 
 const STATUS_OPTIONS: { value: Order["status"]; label: string; color: string }[] = [
+  { value: "pending", label: "En attente", color: "bg-yellow-100 text-yellow-800" },
   { value: "en_attente", label: "En attente", color: "bg-yellow-100 text-yellow-800" },
-  { value: "confirme", label: "Confirmé", color: "bg-green-100 text-green-800" },
+  { value: "confirmed", label: "Confirmé", color: "bg-blue-100 text-blue-800" },
+  { value: "confirme", label: "Confirmé", color: "bg-blue-100 text-blue-800" },
+  { value: "processing", label: "En traitement", color: "bg-purple-100 text-purple-800" },
+  { value: "shipped", label: "Expédié", color: "bg-indigo-100 text-indigo-800" },
+  { value: "delivered", label: "Livré", color: "bg-green-100 text-green-800" },
+  { value: "cancelled", label: "Annulé", color: "bg-red-100 text-red-800" },
   { value: "annule", label: "Annulé", color: "bg-red-100 text-red-800" },
 ];
 
@@ -20,8 +26,32 @@ function StatusBadge({ status }: { status: Order["status"] }) {
   );
 }
 
-export default function OrdersClient({ initialOrders }: { initialOrders: Order[] }) {
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
+const STATUS_MAP: Record<string, string> = {
+  en_attente: "pending",
+  confirme: "confirmed",
+  annule: "cancelled",
+};
+
+function normalizeOrder(raw: Record<string, unknown>): Order {
+  return {
+    id: String(raw.id ?? raw.order_number ?? ""),
+    order_number: String(raw.order_number ?? ""),
+    name: String(raw.full_name ?? raw.name ?? ""),
+    phone: String(raw.phone_number ?? raw.phone ?? ""),
+    wilaya: String(raw.wilaya ?? ""),
+    commune: String(raw.commune ?? ""),
+    address: String(raw.delivery_address ?? raw.address ?? ""),
+    notes: String(raw.notes ?? ""),
+    quantity: Number(raw.quantity ?? 1),
+    total: raw.price ? Number(raw.price) * Number(raw.quantity ?? 1) : Number(raw.total ?? 0),
+    date: raw.created_at ? new Date(raw.created_at as string).toLocaleDateString("fr-DZ") : String(raw.date ?? ""),
+    status: (raw.status as Order["status"]) || "pending",
+    payment_status: String(raw.payment_status ?? "pending"),
+  };
+}
+
+export default function OrdersClient() {
+  const [orders, setOrders] = useState<Order[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
 
@@ -30,12 +60,13 @@ export default function OrdersClient({ initialOrders }: { initialOrders: Order[]
       const res = await fetch("/api/admin/orders");
       if (res.ok) {
         const data = await res.json();
-        setOrders(data.orders?.reverse() || []);
+        setOrders((data.orders || []).reverse().map(normalizeOrder));
       }
     } catch {}
   }, []);
 
   useEffect(() => {
+    refresh();
     const interval = setInterval(refresh, 10000);
     return () => clearInterval(interval);
   }, [refresh]);
@@ -43,10 +74,11 @@ export default function OrdersClient({ initialOrders }: { initialOrders: Order[]
   const handleStatusChange = useCallback(async (orderId: string, newStatus: Order["status"]) => {
     setUpdating(orderId);
     try {
+      const apiStatus = STATUS_MAP[newStatus] || newStatus;
       const res = await fetch(`/api/admin/orders/${orderId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: apiStatus }),
       });
       if (res.ok) refresh();
     } catch {}

@@ -6,8 +6,14 @@ import type { Order } from "@/lib/data";
 import StatusSelect from "./status-select";
 
 const STATUS_OPTIONS: { value: Order["status"]; label: string; color: string }[] = [
+  { value: "pending", label: "En attente", color: "bg-yellow-100 text-yellow-800" },
   { value: "en_attente", label: "En attente", color: "bg-yellow-100 text-yellow-800" },
-  { value: "confirme", label: "Confirmé", color: "bg-green-100 text-green-800" },
+  { value: "confirmed", label: "Confirmé", color: "bg-blue-100 text-blue-800" },
+  { value: "confirme", label: "Confirmé", color: "bg-blue-100 text-blue-800" },
+  { value: "processing", label: "En traitement", color: "bg-purple-100 text-purple-800" },
+  { value: "shipped", label: "Expédié", color: "bg-indigo-100 text-indigo-800" },
+  { value: "delivered", label: "Livré", color: "bg-green-100 text-green-800" },
+  { value: "cancelled", label: "Annulé", color: "bg-red-100 text-red-800" },
   { value: "annule", label: "Annulé", color: "bg-red-100 text-red-800" },
 ];
 
@@ -20,19 +26,47 @@ function StatusBadge({ status }: { status: Order["status"] }) {
   );
 }
 
+const PENDING_STATUSES = ["pending", "en_attente"];
+const CONFIRMED_STATUSES = ["confirmed", "confirme"];
+const CANCELLED_STATUSES = ["cancelled", "annule"];
+
 function computeStats(orders: Order[]) {
   return {
     totalOrders: orders.length,
-    enAttente: orders.filter((o) => o.status === "en_attente").length,
-    confirme: orders.filter((o) => o.status === "confirme").length,
-    annule: orders.filter((o) => o.status === "annule").length,
-    totalRevenue: orders.filter((o) => o.status === "confirme").reduce((sum, o) => sum + o.total, 0),
+    enAttente: orders.filter((o) => PENDING_STATUSES.includes(o.status)).length,
+    confirme: orders.filter((o) => CONFIRMED_STATUSES.includes(o.status)).length,
+    annule: orders.filter((o) => CANCELLED_STATUSES.includes(o.status)).length,
+    totalRevenue: orders.filter((o) => CONFIRMED_STATUSES.includes(o.status)).reduce((sum, o) => sum + (o.total || 0), 0),
     recentOrders: orders.slice(-5).reverse(),
   };
 }
 
-export default function DashboardClient({ initialOrders }: { initialOrders: Order[] }) {
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
+const STATUS_MAP: Record<string, string> = {
+  en_attente: "pending",
+  confirme: "confirmed",
+  annule: "cancelled",
+};
+
+function normalizeOrder(raw: Record<string, unknown>): Order {
+  return {
+    id: String(raw.id ?? raw.order_number ?? ""),
+    order_number: String(raw.order_number ?? ""),
+    name: String(raw.full_name ?? raw.name ?? ""),
+    phone: String(raw.phone_number ?? raw.phone ?? ""),
+    wilaya: String(raw.wilaya ?? ""),
+    commune: String(raw.commune ?? ""),
+    address: String(raw.delivery_address ?? raw.address ?? ""),
+    notes: String(raw.notes ?? ""),
+    quantity: Number(raw.quantity ?? 1),
+    total: raw.price ? Number(raw.price) * Number(raw.quantity ?? 1) : Number(raw.total ?? 0),
+    date: raw.created_at ? new Date(raw.created_at as string).toLocaleDateString("fr-DZ") : String(raw.date ?? ""),
+    status: (raw.status as Order["status"]) || "pending",
+    payment_status: String(raw.payment_status ?? "pending"),
+  };
+}
+
+export default function DashboardClient() {
+  const [orders, setOrders] = useState<Order[]>([]);
   const [updating, setUpdating] = useState<string | null>(null);
 
   const stats = computeStats(orders);
@@ -42,12 +76,13 @@ export default function DashboardClient({ initialOrders }: { initialOrders: Orde
       const res = await fetch("/api/admin/orders");
       if (res.ok) {
         const data = await res.json();
-        setOrders(data.orders || []);
+        setOrders((data.orders || []).map(normalizeOrder));
       }
     } catch {}
   }, []);
 
   useEffect(() => {
+    refresh();
     const interval = setInterval(refresh, 10000);
     return () => clearInterval(interval);
   }, [refresh]);
@@ -55,10 +90,11 @@ export default function DashboardClient({ initialOrders }: { initialOrders: Orde
   const handleStatusChange = useCallback(async (orderId: string, newStatus: Order["status"]) => {
     setUpdating(orderId);
     try {
+      const apiStatus = STATUS_MAP[newStatus] || newStatus;
       const res = await fetch(`/api/admin/orders/${orderId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: apiStatus }),
       });
       if (res.ok) refresh();
     } catch {}
@@ -128,16 +164,16 @@ export default function DashboardClient({ initialOrders }: { initialOrders: Orde
               {stats.recentOrders.map((order) => (
                 <div key={order.id} className="rounded-xl border border-border bg-surface p-4">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-text">{order.name}</span>
+                    <span className="font-medium text-text">{order.name || "N/A"}</span>
                     <StatusBadge status={order.status} />
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted">
-                    <div><span className="block text-[10px] uppercase tracking-wider text-muted/60">Téléphone</span>{order.phone}</div>
-                    <div><span className="block text-[10px] uppercase tracking-wider text-muted/60">Wilaya</span>{order.wilaya}</div>
-                    <div><span className="block text-[10px] uppercase tracking-wider text-muted/60">Commune</span>{order.commune}</div>
-                    <div><span className="block text-[10px] uppercase tracking-wider text-muted/60">Qté</span>{order.quantity}</div>
+                    <div><span className="block text-[10px] uppercase tracking-wider text-muted/60">Téléphone</span>{order.phone || "—"}</div>
+                    <div><span className="block text-[10px] uppercase tracking-wider text-muted/60">Wilaya</span>{order.wilaya || "—"}</div>
+                    <div><span className="block text-[10px] uppercase tracking-wider text-muted/60">Commune</span>{order.commune || "—"}</div>
+                    <div><span className="block text-[10px] uppercase tracking-wider text-muted/60">Qté</span>{order.quantity ?? "—"}</div>
                     <div><span className="block text-[10px] uppercase tracking-wider text-muted/60">Total</span><span className="font-medium text-text">{formatPrice(order.total)}</span></div>
-                    <div><span className="block text-[10px] uppercase tracking-wider text-muted/60">Date</span>{order.date}</div>
+                    <div><span className="block text-[10px] uppercase tracking-wider text-muted/60">Date</span>{order.date || "—"}</div>
                   </div>
                     {updating === order.id ? (
                       <div className="mt-3 border-t border-border pt-3 text-xs text-muted">Mise à jour…</div>
@@ -181,12 +217,12 @@ export default function DashboardClient({ initialOrders }: { initialOrders: Orde
                 <tbody>
                   {stats.recentOrders.map((order) => (
                     <tr key={order.id} className="border-b border-border last:border-0">
-                      <td className="whitespace-nowrap px-4 py-3 text-text">{order.name}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-muted">{order.phone}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-muted">{order.wilaya}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-muted">{order.commune}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-muted max-w-[160px] truncate" title={order.address}>{order.address}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-muted">{order.quantity}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-text">{order.name || "N/A"}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-muted">{order.phone || "—"}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-muted">{order.wilaya || "—"}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-muted">{order.commune || "—"}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-muted max-w-[160px] truncate" title={order.address || ""}>{order.address || "—"}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-muted">{order.quantity ?? "—"}</td>
                       <td className="whitespace-nowrap px-4 py-3 font-medium">{formatPrice(order.total)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-muted">{order.date}</td>
                       <td className="whitespace-nowrap px-4 py-3">

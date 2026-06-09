@@ -4,8 +4,14 @@ import { useState } from "react";
 import type { Order } from "@/lib/data";
 
 const STATUSES: { value: Order["status"]; label: string; bg: string; fg: string }[] = [
+  { value: "pending", label: "En attente", bg: "#fef9c3", fg: "#854d0e" },
   { value: "en_attente", label: "En attente", bg: "#fef9c3", fg: "#854d0e" },
-  { value: "confirme", label: "Confirmé", bg: "#dcfce7", fg: "#166534" },
+  { value: "confirmed", label: "Confirmé", bg: "#dbeafe", fg: "#1e40af" },
+  { value: "confirme", label: "Confirmé", bg: "#dbeafe", fg: "#1e40af" },
+  { value: "processing", label: "En traitement", bg: "#f3e8ff", fg: "#6b21a8" },
+  { value: "shipped", label: "Expédié", bg: "#e0e7ff", fg: "#3730a3" },
+  { value: "delivered", label: "Livré", bg: "#dcfce7", fg: "#166534" },
+  { value: "cancelled", label: "Annulé", bg: "#fee2e2", fg: "#991b1b" },
   { value: "annule", label: "Annulé", bg: "#fee2e2", fg: "#991b1b" },
 ];
 
